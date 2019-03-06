@@ -972,9 +972,9 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	// defined off of.
 	s := swaggerObject{
 		// Swagger 2.0 is the version of this document
-		Swagger:           "2.0",
-		Schemes:           []string{"http", "https"},
-		Consumes:          []string{"application/json"},
+		Swagger: "2.0",
+		Schemes: []string{"http", "https"},
+		// Consumes:          []string{"application/json"}, // alan chg for yapi
 		Produces:          []string{"application/json"},
 		Paths:             make(swaggerPathsObject),
 		Definitions:       make(swaggerDefinitionsObject),
@@ -1245,6 +1245,8 @@ func newCommentObject(comment string, setDescIfEmpty bool) *commentObject {
 	if setDescIfEmpty && co.Description == "" {
 		co.Description = co.Summary
 	}
+	// yapi desc
+	co.Description = strings.Replace(co.Description, "\n", "<br/>", -1)
 
 	return co
 }
