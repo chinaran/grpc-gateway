@@ -245,3 +245,17 @@ type enumMap map[string]*descriptor.Enum
 
 // Internal type to store used references.
 type refMap map[string]struct{}
+
+// message of comment
+type commentObject struct {
+	// title
+	Summary string
+	// @desc
+	Description string
+	// @eg
+	Example json.RawMessage
+	// @default
+	Default string
+	// @required
+	Required bool
+}

@@ -732,8 +732,14 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, re
 						*minItems = 1
 					}
 
+					/* update path parameter by comment (Alan 2019-03-06 14:35:53) */
+					comment := fieldProtoComments(reg, parameter.Target.Message, parameter.Target)
+					co := newCommentObject(comment, true)
 					if desc == "" {
-						desc = fieldProtoComments(reg, parameter.Target.Message, parameter.Target)
+						desc = co.Description
+					}
+					if defaultValue == "" {
+						defaultValue = co.Default
 					}
 
 					parameters = append(parameters, swaggerParameterObject{
@@ -1202,6 +1208,47 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	return &s, nil
 }
 
+// newCommentObject
+//
+// 支持 @required @default @desc @eg
+// 可以写在一行或多行，但 summary/title 必须在最前面
+func newCommentObject(comment string, setDescIfEmpty bool) *commentObject {
+	co := &commentObject{}
+	if comment == "" {
+		return co
+	}
+
+	items := strings.Split(comment, "@")
+	co.Summary = strings.TrimSpace(items[0])
+	for _, v := range items[1:] {
+		fields := strings.SplitN(strings.TrimSpace(v), " ", 2)
+		key, val := fields[0], ""
+		if len(fields) == 2 {
+			val = strings.Trim(fields[1], " \n")
+		}
+		switch key {
+		case "required":
+			co.Required = true
+			// glog.V(1).Infof("required = %v\n", co.Required)
+		case "desc":
+			co.Description = val
+			// glog.V(1).Infof("desc = %v\n", co.Description)
+		case "default":
+			co.Default = val
+			// glog.V(1).Infof("default = %v\n", co.Default)
+		case "eg":
+			co.Example = []byte(val)
+			// glog.V(1).Infof("eg = %v\n", co.Example)
+		}
+	}
+	// if desc empty set it as summary
+	if setDescIfEmpty && co.Description == "" {
+		co.Description = co.Summary
+	}
+
+	return co
+}
+
 // updateSwaggerDataFromComments updates a Swagger object based on a comment
 // from the proto file.
 //
@@ -1248,53 +1295,26 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 		usingTitle = true
 	}
 
-	// 支持 @required @default @desc @eg
-	// 可以写在一行或多行，但 summary/title 必须在最前面
-	tmp := strings.Replace(comment, "\n", " ", -1)
-	items := strings.Split(tmp, "@")
-
+	/* update swagger object by comment (Alan 2019-03-06 14:35:53) */
+	co := newCommentObject(comment, descDefSummary)
 	if summaryValue.CanSet() {
-		summary := strings.TrimSpace(items[0])
-		description, defaultVal, example, required := "", "", "", false
-		if descDefSummary {
-			description = summary
-		}
-
-		for _, v := range items {
-			fields := strings.Split(strings.TrimSpace(v), " ")
-			switch fields[0] {
-			case "required":
-				required = true
-				// glog.V(1).Infof("required = %v\n", required)
-			case "desc":
-				description = strings.Join(fields[1:], " ")
-				// glog.V(1).Infof("desc = %v\n", description)
-			case "default":
-				defaultVal = strings.Join(fields[1:], " ")
-				// glog.V(1).Infof("default = %v\n", defaultVal)
-			case "eg":
-				example = strings.Join(fields[1:], " ")
-				// glog.V(1).Infof("eg = %v\n", example)
-			}
-		}
-
-		if !usingTitle || (len(summary) > 0 && summary[len(summary)-1] != '.') {
+		if !usingTitle || (len(co.Summary) > 0 && co.Summary[len(co.Summary)-1] != '.') {
 			// overrides the schema value only if it's empty
 			// keep the comment precedence when updating the package definition
 			if summaryValue.Len() == 0 || isPackageObject {
-				summaryValue.Set(reflect.ValueOf(summary))
+				summaryValue.Set(reflect.ValueOf(co.Summary))
 			}
 			if descriptionValue.CanSet() && (descriptionValue.Len() == 0 || isPackageObject) {
-				descriptionValue.Set(reflect.ValueOf(description))
+				descriptionValue.Set(reflect.ValueOf(co.Description))
 			}
 			if defaultValue.CanSet() && (defaultValue.Len() == 0 || isPackageObject) {
-				defaultValue.Set(reflect.ValueOf(defaultVal))
+				defaultValue.Set(reflect.ValueOf(co.Default))
 			}
 			if exampleValue.CanSet() && (exampleValue.Len() == 0 || isPackageObject) {
-				exampleValue.Set(reflect.ValueOf([]byte(example)))
+				exampleValue.Set(reflect.ValueOf(co.Example))
 			}
 			if requiredValue.CanSet() {
-				requiredValue.Set(reflect.ValueOf(required))
+				requiredValue.Set(reflect.ValueOf(co.Required))
 			}
 			return nil
 		}
