@@ -118,19 +118,18 @@ func queryParams(message *descriptor.Message, field *descriptor.Field, prefix st
 			return nil, nil // TODO: currently, mapping object in query parameter is not supported
 		}
 		desc := schema.Description
-		if schema.Title != "" { // merge title because title of parameter object will be ignored
-			desc = strings.TrimSpace(schema.Title + ". " + schema.Description)
-		}
+		// if schema.Title != "" { // merge title because title of parameter object will be ignored
+		// 	desc = strings.TrimSpace(schema.Title + ". " + schema.Description)
+		// }
 
 		// verify if the field is required
-		required := false
-		for _, fieldName := range schema.Required {
-			if fieldName == field.GetName() {
-				required = true
-				break
-			}
-		}
-
+		// required := false
+		// for _, fieldName := range schema.Required {
+		// 	if fieldName == field.GetName() {
+		// 		required = true
+		// 		break
+		// 	}
+		// }
 		param := swaggerParameterObject{
 			Description: desc,
 			In:          "query",
@@ -138,7 +137,7 @@ func queryParams(message *descriptor.Message, field *descriptor.Field, prefix st
 			Type:        schema.Type,
 			Items:       schema.Items,
 			Format:      schema.Format,
-			Required:    required,
+			Required:    schema.KeyRequired,
 		}
 
 		if reg.GetUseJSONNamesForFields() {
@@ -305,6 +304,7 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 			}
 		}
 
+		var requireds []string // from comments
 		for _, f := range msg.Fields {
 			fieldValue := schemaOfField(f, reg, customRefs)
 			comments := fieldProtoComments(reg, msg, f)
@@ -318,10 +318,17 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 			} else {
 				kv.Key = f.GetName()
 			}
+			if fieldValue.KeyRequired {
+				requireds = append(requireds, kv.Key)
+			}
 			if schema.Properties == nil {
 				schema.Properties = &swaggerSchemaObjectProperties{}
 			}
 			*schema.Properties = append(*schema.Properties, kv)
+		}
+		// required by comments
+		if len(schema.Required) == 0 && len(requireds) > 0 {
+			schema.Required = requireds
 		}
 		d[fullyQualifiedNameToSwaggerName(msg.FQMN(), reg)] = schema
 	}
@@ -1212,6 +1219,8 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 		return nil
 	}
 
+	_, descDefSummary := swaggerObject.(*swaggerSchemaObject) // or swaggerOperationObject
+
 	// Figure out what to apply changes to.
 	swaggerObjectValue := reflect.ValueOf(swaggerObject)
 	infoObjectValue := swaggerObjectValue.Elem().FieldByName("Info")
@@ -1224,6 +1233,9 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 	// Figure out which properties to update.
 	summaryValue := infoObjectValue.FieldByName("Summary")
 	descriptionValue := infoObjectValue.FieldByName("Description")
+	defaultValue := infoObjectValue.FieldByName("Default")
+	exampleValue := infoObjectValue.FieldByName("Example")
+	requiredValue := infoObjectValue.FieldByName("KeyRequired")
 	readOnlyValue := infoObjectValue.FieldByName("ReadOnly")
 
 	if readOnlyValue.Kind() == reflect.Bool && readOnlyValue.CanSet() && strings.Contains(comment, "Output only.") {
@@ -1236,28 +1248,53 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 		usingTitle = true
 	}
 
-	paragraphs := strings.Split(comment, "\n\n")
+	// 支持 @required @default @desc @eg
+	// 可以写在一行或多行，但 summary/title 必须在最前面
+	tmp := strings.Replace(comment, "\n", " ", -1)
+	items := strings.Split(tmp, "@")
 
-	// If there is a summary (or summary-equivalent) and it's empty, use the first
-	// paragraph as summary, and the rest as description.
 	if summaryValue.CanSet() {
-		summary := strings.TrimSpace(paragraphs[0])
-		description := strings.TrimSpace(strings.Join(paragraphs[1:], "\n\n"))
+		summary := strings.TrimSpace(items[0])
+		description, defaultVal, example, required := "", "", "", false
+		if descDefSummary {
+			description = summary
+		}
+
+		for _, v := range items {
+			fields := strings.Split(strings.TrimSpace(v), " ")
+			switch fields[0] {
+			case "required":
+				required = true
+				// glog.V(1).Infof("required = %v\n", required)
+			case "desc":
+				description = strings.Join(fields[1:], " ")
+				// glog.V(1).Infof("desc = %v\n", description)
+			case "default":
+				defaultVal = strings.Join(fields[1:], " ")
+				// glog.V(1).Infof("default = %v\n", defaultVal)
+			case "eg":
+				example = strings.Join(fields[1:], " ")
+				// glog.V(1).Infof("eg = %v\n", example)
+			}
+		}
+
 		if !usingTitle || (len(summary) > 0 && summary[len(summary)-1] != '.') {
 			// overrides the schema value only if it's empty
 			// keep the comment precedence when updating the package definition
 			if summaryValue.Len() == 0 || isPackageObject {
 				summaryValue.Set(reflect.ValueOf(summary))
 			}
-			if len(description) > 0 {
-				if !descriptionValue.CanSet() {
-					return fmt.Errorf("Encountered object type with a summary, but no description")
-				}
-				// overrides the schema value only if it's empty
-				// keep the comment precedence when updating the package definition
-				 if descriptionValue.Len() == 0 || isPackageObject {
-					descriptionValue.Set(reflect.ValueOf(description))
-				 }
+			if descriptionValue.CanSet() && (descriptionValue.Len() == 0 || isPackageObject) {
+				descriptionValue.Set(reflect.ValueOf(description))
+			}
+			if defaultValue.CanSet() && (defaultValue.Len() == 0 || isPackageObject) {
+				defaultValue.Set(reflect.ValueOf(defaultVal))
+			}
+			if exampleValue.CanSet() && (exampleValue.Len() == 0 || isPackageObject) {
+				exampleValue.Set(reflect.ValueOf([]byte(example)))
+			}
+			if requiredValue.CanSet() {
+				requiredValue.Set(reflect.ValueOf(required))
 			}
 			return nil
 		}
@@ -1265,8 +1302,8 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 
 	// There was no summary field on the swaggerObject. Try to apply the
 	// whole comment into description if the swagger object description is empty.
-	if descriptionValue.CanSet() && (descriptionValue.Len() == 0 || isPackageObject){
-		descriptionValue.Set(reflect.ValueOf(strings.Join(paragraphs, "\n\n")))
+	if descriptionValue.CanSet() && (descriptionValue.Len() == 0 || isPackageObject) {
+		descriptionValue.Set(reflect.ValueOf(comment))
 		return nil
 	}
 
