@@ -667,9 +667,14 @@ func isResourceName(prefix string) bool {
 	return field == "parent" || field == "name"
 }
 
-func renderServices(services []*descriptor.Service, paths swaggerPathsObject, reg *descriptor.Registry, requestResponseRefs, customRefs refMap) error {
+func renderServices(services []*descriptor.Service, paths swaggerPathsObject, tags *[]*tagObject, reg *descriptor.Registry, requestResponseRefs, customRefs refMap) error {
 	// Correctness of svcIdx and methIdx depends on 'services' containing the services in the same order as the 'file.Service' array.
 	for svcIdx, svc := range services {
+		/* update swagger tags by comment (Alan 2019-03-06 14:35:53) */
+		svcComments := protoComments(reg, svc.File, nil, "Service", int32(svcIdx))
+		svcCommentObj := newCommentObject(svcComments, true)
+		*tags = append(*tags, &tagObject{Name: svcCommentObj.Summary, Description: svcCommentObj.Description})
+
 		for methIdx, meth := range svc.Methods {
 			for bIdx, b := range meth.Bindings {
 				// Iterate over all the swagger parameters
@@ -852,11 +857,14 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, re
 					responseSchema.Ref = strings.Replace(responseSchema.Ref, `#/definitions/`, `#/x-stream-definitions/`, 1)
 				}
 
-				tag := svc.GetName()
+				/* update service tag by comment (Alan 2019-03-06 14:35:53) */
+				tag := svcCommentObj.Summary
+				if tag == "" {
+					tag = svc.GetName()
+				}
 				if pkg := svc.File.GetPackage(); pkg != "" && reg.IsIncludePackageInTags() {
 					tag = pkg + "." + tag
 				}
-
 				operationObject := &swaggerOperationObject{
 					Tags:       []string{tag},
 					Parameters: parameters,
@@ -972,9 +980,10 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	// defined off of.
 	s := swaggerObject{
 		// Swagger 2.0 is the version of this document
-		Swagger: "2.0",
-		Schemes: []string{"http", "https"},
-		// Consumes:          []string{"application/json"}, // alan chg for yapi
+		Swagger:           "2.0",
+		Schemes:           []string{"http", "https"},
+		Tags:              []*tagObject{},
+		Consumes:          []string{}, // alan chg for yapi
 		Produces:          []string{"application/json"},
 		Paths:             make(swaggerPathsObject),
 		Definitions:       make(swaggerDefinitionsObject),
@@ -989,7 +998,7 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	// and create entries for all of them.
 	// Also adds custom user specified references to second map.
 	requestResponseRefs, customRefs := refMap{}, refMap{}
-	if err := renderServices(p.Services, s.Paths, p.reg, requestResponseRefs, customRefs); err != nil {
+	if err := renderServices(p.Services, s.Paths, &s.Tags, p.reg, requestResponseRefs, customRefs); err != nil {
 		panic(err)
 	}
 

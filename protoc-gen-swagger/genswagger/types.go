@@ -52,6 +52,7 @@ type swaggerObject struct {
 	Info                swaggerInfoObject                   `json:"info"`
 	Host                string                              `json:"host,omitempty"`
 	BasePath            string                              `json:"basePath,omitempty"`
+	Tags                []*tagObject                        `json:"tags,omitempty"`
 	Schemes             []string                            `json:"schemes"`
 	Consumes            []string                            `json:"consumes"`
 	Produces            []string                            `json:"produces"`
@@ -258,4 +259,14 @@ type commentObject struct {
 	Default string
 	// @required
 	Required bool
+}
+
+// tag object
+type tagObject struct {
+	// name
+	Name string `json:"name,omitempty"`
+	// service object.
+	Description string `json:"description,omitempty"`
+	// external docs
+	ExternalDocs *swaggerExternalDocumentationObject `json:"externalDocs,omitempty"`
 }
