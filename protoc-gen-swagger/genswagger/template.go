@@ -672,7 +672,7 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 	for svcIdx, svc := range services {
 		/* update swagger tags by comment (Alan 2019-03-06 14:35:53) */
 		svcComments := protoComments(reg, svc.File, nil, "Service", int32(svcIdx))
-		svcCommentObj := newCommentObject(svcComments, true)
+		svcCommentObj := newCommentObject(svcComments, true, false)
 		*tags = append(*tags, &tagObject{Name: svcCommentObj.Summary, Description: svcCommentObj.Description})
 
 		for methIdx, meth := range svc.Methods {
@@ -739,7 +739,7 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 
 					/* update path parameter by comment (Alan 2019-03-06 14:35:53) */
 					comment := fieldProtoComments(reg, parameter.Target.Message, parameter.Target)
-					co := newCommentObject(comment, true)
+					co := newCommentObject(comment, true, false)
 					if desc == "" {
 						desc = co.Description
 					}
@@ -1221,7 +1221,7 @@ func applyTemplate(p param) (*swaggerObject, error) {
 //
 // 支持 @required @default @desc @eg
 // 可以写在一行或多行，但 summary/title 必须在最前面
-func newCommentObject(comment string, setDescIfEmpty bool) *commentObject {
+func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *commentObject {
 	co := &commentObject{}
 	if comment == "" {
 		return co
@@ -1255,7 +1255,9 @@ func newCommentObject(comment string, setDescIfEmpty bool) *commentObject {
 		co.Description = co.Summary
 	}
 	// yapi desc
-	co.Description = strings.Replace(co.Description, "\n", "<br/>", -1)
+	if replaceDescEnter {
+		co.Description = strings.Replace(co.Description, "\n", "<br/>", -1)
+	}
 
 	return co
 }
@@ -1278,6 +1280,7 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 	}
 
 	_, descDefSummary := swaggerObject.(*swaggerSchemaObject) // or swaggerOperationObject
+	_, replaceDescEnter := swaggerObject.(*swaggerOperationObject)
 
 	// Figure out what to apply changes to.
 	swaggerObjectValue := reflect.ValueOf(swaggerObject)
@@ -1307,7 +1310,7 @@ func updateSwaggerDataFromComments(swaggerObject interface{}, comment string, is
 	}
 
 	/* update swagger object by comment (Alan 2019-03-06 14:35:53) */
-	co := newCommentObject(comment, descDefSummary)
+	co := newCommentObject(comment, descDefSummary, replaceDescEnter)
 	if summaryValue.CanSet() {
 		if !usingTitle || (len(co.Summary) > 0 && co.Summary[len(co.Summary)-1] != '.') {
 			// overrides the schema value only if it's empty
