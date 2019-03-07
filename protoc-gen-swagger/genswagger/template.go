@@ -677,6 +677,10 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 
 		for methIdx, meth := range svc.Methods {
 			for bIdx, b := range meth.Bindings {
+				/* Only export the first binding (Alan 2019-03-07 20:32:24) */
+				if bIdx != 0 {
+					continue
+				}
 				// Iterate over all the swagger parameters
 				parameters := swaggerParametersObject{}
 				for _, parameter := range b.PathParams {
