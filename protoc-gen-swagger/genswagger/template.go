@@ -1226,7 +1226,7 @@ func applyTemplate(p param) (*swaggerObject, error) {
 
 // newCommentObject
 //
-// 支持 @required @default @desc @eg
+// 支持 @required @default @desc 等
 // 可以写在一行或多行，但 summary/title 必须在最前面
 func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *commentObject {
 	co := &commentObject{}
@@ -1266,6 +1266,12 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 			co.Output = true
 		case "input":
 			co.Input = true
+		case "units":
+			co.Units = val
+			extra = append(extra, "单位: "+val)
+		case "format":
+			co.Format = val
+			extra = append(extra, "格式: "+val)
 		}
 	}
 
@@ -1277,7 +1283,7 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 		extra = append(extra, "保留的")
 	}
 	if len(extra) > 0 {
-		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, "/"))
+		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, " | "))
 	}
 	// if desc empty set it as summary
 	if setDescIfEmpty && co.Description == "" {

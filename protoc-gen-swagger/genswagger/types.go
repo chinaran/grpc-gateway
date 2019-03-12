@@ -269,6 +269,10 @@ type commentObject struct {
 	Output bool
 	// @input
 	Input bool
+	// @units
+	Units string
+	// @format
+	Format string
 }
 
 // tag object
