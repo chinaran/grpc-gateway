@@ -103,6 +103,9 @@ func queryParams(message *descriptor.Message, field *descriptor.Field, prefix st
 	fieldType := field.GetTypeName()
 	if message.File != nil {
 		comments := fieldProtoComments(reg, message, field)
+		if excludeFromComment(comments) || onlyOutputFromComment(comments) {
+			return nil, nil
+		}
 		if err := updateSwaggerDataFromComments(&schema, comments, false); err != nil {
 			return nil, err
 		}
@@ -308,6 +311,9 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 		for _, f := range msg.Fields {
 			fieldValue := schemaOfField(f, reg, customRefs)
 			comments := fieldProtoComments(reg, msg, f)
+			if excludeFromComment(comments) {
+				continue
+			}
 			if err := updateSwaggerDataFromComments(&fieldValue, comments, false); err != nil {
 				panic(err)
 			}
@@ -897,6 +903,9 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 				}
 
 				methComments := protoComments(reg, svc.File, nil, "Method", int32(svcIdx), methProtoPath, int32(methIdx))
+				if excludeFromComment(methComments) {
+					continue
+				}
 				if err := updateSwaggerDataFromComments(operationObject, methComments, false); err != nil {
 					panic(err)
 				}
@@ -1282,6 +1291,12 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	if co.Reserved {
 		extra = append(extra, "保留的")
 	}
+	if co.Output {
+		extra = append(extra, "RESP_ONLY")
+	}
+	if co.Input {
+		extra = append(extra, "REQ_ONLY")
+	}
 	if len(extra) > 0 {
 		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, " | "))
 	}
@@ -1295,6 +1310,27 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	}
 
 	return co
+}
+
+// excludeFromComment
+//
+// 导出信息时是否排除
+func excludeFromComment(comment string) bool {
+	return strings.Contains(comment, "@exclude")
+}
+
+// onlyOutputFromComment
+//
+// 公共结构中，该参数只包含在 request 中
+func onlyOutputFromComment(comment string) bool {
+	return strings.Contains(comment, "@output")
+}
+
+// onlyInputFromComment
+//
+// 公共结构中，该参数只包含在 response 中
+func onlyInputFromComment(comment string) bool {
+	return strings.Contains(comment, "@input")
 }
 
 // updateSwaggerDataFromComments updates a Swagger object based on a comment
