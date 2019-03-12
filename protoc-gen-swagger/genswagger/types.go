@@ -259,6 +259,16 @@ type commentObject struct {
 	Default string
 	// @required
 	Required bool
+	// @exclude
+	Exclude bool
+	// @deprecated
+	Deprecated bool
+	// @reserved
+	Reserved bool
+	// @output
+	Output bool
+	// @input
+	Input bool
 }
 
 // tag object

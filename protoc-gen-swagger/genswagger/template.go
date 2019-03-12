@@ -673,6 +673,9 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 		/* update swagger tags by comment (Alan 2019-03-06 14:35:53) */
 		svcComments := protoComments(reg, svc.File, nil, "Service", int32(svcIdx))
 		svcCommentObj := newCommentObject(svcComments, true, false)
+		if svcCommentObj.Exclude {
+			continue
+		}
 		*tags = append(*tags, &tagObject{Name: svcCommentObj.Summary, Description: svcCommentObj.Description})
 
 		for methIdx, meth := range svc.Methods {
@@ -1231,6 +1234,7 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 		return co
 	}
 
+	var extra []string
 	items := strings.Split(comment, "@")
 	co.Summary = strings.TrimSpace(items[0])
 	for _, v := range items[1:] {
@@ -1252,7 +1256,28 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 		case "eg":
 			co.Example = []byte(val)
 			// glog.V(1).Infof("eg = %v\n", co.Example)
+		case "exclude":
+			co.Exclude = true
+		case "deprecated":
+			co.Deprecated = true
+		case "reserved":
+			co.Reserved = true
+		case "output":
+			co.Output = true
+		case "input":
+			co.Input = true
 		}
+	}
+
+	// fixed: 标识重复
+	if co.Deprecated {
+		extra = append(extra, "已废弃")
+	}
+	if co.Reserved {
+		extra = append(extra, "保留的")
+	}
+	if len(extra) > 0 {
+		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, "/"))
 	}
 	// if desc empty set it as summary
 	if setDescIfEmpty && co.Description == "" {
