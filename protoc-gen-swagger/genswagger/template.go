@@ -1281,6 +1281,9 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 		case "format":
 			co.Format = val
 			extra = append(extra, "格式: "+val)
+		case "value":
+			co.Value = val
+			extra = append(extra, "取值: "+val)
 		}
 	}
 

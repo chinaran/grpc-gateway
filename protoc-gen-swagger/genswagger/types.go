@@ -273,6 +273,8 @@ type commentObject struct {
 	Units string
 	// @format
 	Format string
+	// @value
+	Value string
 }
 
 // tag object
