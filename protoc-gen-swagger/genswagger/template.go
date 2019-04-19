@@ -17,6 +17,18 @@ import (
 	swagger_options "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger/options"
 )
 
+const (
+	_AnyTypeName    = ".google.protobuf.Any"
+	_AnyTypeComment = `Any 是一种通用类型，可以存储多种结构，使用者可以通过 "@type" 字段来解析
+结构示例:
+{
+  "@type": "type.googleapis.com/xxx",
+  "value": {json object}
+} @noparse`
+	_AnyTypeField1Comment = `数据类型，解析时可作为标识（string）`
+	_AnyTypeField2Comment = `数据值（json object）`
+)
+
 var wktSchemas = map[string]schemaCore{
 	".google.protobuf.Timestamp": schemaCore{
 		Type:   "string",
@@ -105,6 +117,14 @@ func queryParams(message *descriptor.Message, field *descriptor.Field, prefix st
 		comments := fieldProtoComments(reg, message, field)
 		if excludeFromComment(comments) || onlyOutputFromComment(comments) {
 			return nil, nil
+		}
+		if *message.Name == "Any" { // 特殊处理
+			if *field.Name == "type_url" && *field.Number == 1 {
+				*field.Name = "@type"
+				comments = _AnyTypeField1Comment
+			} else if *field.Name == "value" && *field.Number == 2 {
+				comments = _AnyTypeField2Comment
+			}
 		}
 		if err := updateSwaggerDataFromComments(&schema, comments, false); err != nil {
 			return nil, err
@@ -265,6 +285,10 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 			},
 		}
 		msgComments := protoComments(reg, msg.File, msg.Outers, "MessageType", int32(msg.Index))
+		glog.V(1).Infof("name = %v\n", name)
+		if name == _AnyTypeName { // 特殊处理
+			msgComments = _AnyTypeComment
+		}
 		if err := updateSwaggerDataFromComments(&schema, msgComments, false); err != nil {
 			panic(err)
 		}
@@ -313,6 +337,14 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 			comments := fieldProtoComments(reg, msg, f)
 			if excludeFromComment(comments) {
 				continue
+			}
+			if name == _AnyTypeName { // 特殊处理
+				if (*f.Name == "type_url" || *f.Name == "@type") && *f.Number == 1 {
+					*f.Name = "@type"
+					comments = _AnyTypeField1Comment
+				} else if *f.Name == "value" && *f.Number == 2 {
+					comments = _AnyTypeField2Comment
+				}
 			}
 			if err := updateSwaggerDataFromComments(&fieldValue, comments, false); err != nil {
 				panic(err)
@@ -1233,6 +1265,21 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	return &s, nil
 }
 
+func finalCommnetObject(co *commentObject, setDescIfEmpty, replaceDescEnter bool) *commentObject {
+	if co == nil {
+		return co
+	}
+	// if desc empty set it as summary
+	if setDescIfEmpty && co.Description == "" {
+		co.Description = co.Summary
+	}
+	// yapi desc
+	if replaceDescEnter {
+		co.Description = strings.Replace(co.Description, "\n", "<br/>", -1)
+	}
+	return co
+}
+
 // newCommentObject
 //
 // 支持 @required @default @desc 等
@@ -1241,6 +1288,11 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	co := &commentObject{}
 	if comment == "" {
 		return co
+	}
+	// @noparse 不对注释进行解析
+	if strings.Contains(comment, "@noparse") {
+		co.Summary = strings.Replace(comment, "@noparse", "", -1)
+		return finalCommnetObject(co, setDescIfEmpty, replaceDescEnter)
 	}
 
 	var extra []string
@@ -1303,16 +1355,8 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	if len(extra) > 0 {
 		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, " | "))
 	}
-	// if desc empty set it as summary
-	if setDescIfEmpty && co.Description == "" {
-		co.Description = co.Summary
-	}
-	// yapi desc
-	if replaceDescEnter {
-		co.Description = strings.Replace(co.Description, "\n", "<br/>", -1)
-	}
 
-	return co
+	return finalCommnetObject(co, setDescIfEmpty, replaceDescEnter)
 }
 
 // excludeFromComment
