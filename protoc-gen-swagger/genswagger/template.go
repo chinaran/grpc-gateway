@@ -24,10 +24,26 @@ const (
 {
   "@type": "type.googleapis.com/xxx",
   "value": {json object}
-} @noparse`
+}`
 	_AnyTypeField1Comment = `数据类型，解析时可作为标识（string）`
 	_AnyTypeField2Comment = `数据值（json object）`
 )
+
+var _CommentTag = map[string]bool{
+	"required":   true,
+	"desc":       true,
+	"default":    true,
+	"eg":         true,
+	"exclude":    true,
+	"deprecated": true,
+	"reserved":   true,
+	"output":     true,
+	"input":      true,
+	"units":      true,
+	"format":     true,
+	"value":      true,
+	"note":       true,
+}
 
 var wktSchemas = map[string]schemaCore{
 	".google.protobuf.Timestamp": schemaCore{
@@ -1265,6 +1281,7 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	return &s, nil
 }
 
+// 最后根据规则处理
 func finalCommnetObject(co *commentObject, setDescIfEmpty, replaceDescEnter bool) *commentObject {
 	if co == nil {
 		return co
@@ -1280,6 +1297,25 @@ func finalCommnetObject(co *commentObject, setDescIfEmpty, replaceDescEnter bool
 	return co
 }
 
+// 过滤不存在tag，把原本的内容放到上一个item里
+func commnetTagFilter(comment string) []string {
+	var ret []string
+	items := strings.Split(comment, "@")
+	// summary
+	ret = append(ret, items[0])
+	// other tags
+	for _, v := range items[1:] {
+		fields := strings.SplitN(strings.TrimSpace(v), " ", 2)
+		key := fields[0]
+		if _, ok := _CommentTag[key]; ok {
+			ret = append(ret, v)
+		} else {
+			ret[len(ret)-1] += "@" + v
+		}
+	}
+	return ret
+}
+
 // newCommentObject
 //
 // 支持 @required @default @desc 等
@@ -1289,14 +1325,8 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	if comment == "" {
 		return co
 	}
-	// @noparse 不对注释进行解析
-	if strings.Contains(comment, "@noparse") {
-		co.Summary = strings.Replace(comment, "@noparse", "", -1)
-		return finalCommnetObject(co, setDescIfEmpty, replaceDescEnter)
-	}
-
 	var extra []string
-	items := strings.Split(comment, "@")
+	items := commnetTagFilter(comment)
 	co.Summary = strings.TrimSpace(items[0])
 	for _, v := range items[1:] {
 		fields := strings.SplitN(strings.TrimSpace(v), " ", 2)
@@ -1336,6 +1366,8 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 		case "value":
 			co.Value = val
 			extra = append(extra, "取值: "+val)
+		case "note":
+			extra = append(extra, val)
 		}
 	}
 
