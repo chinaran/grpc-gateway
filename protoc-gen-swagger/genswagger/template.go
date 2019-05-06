@@ -30,19 +30,20 @@ const (
 )
 
 var _CommentTag = map[string]bool{
-	"required":   true,
-	"desc":       true,
-	"default":    true,
-	"eg":         true,
-	"exclude":    true,
-	"deprecated": true,
-	"reserved":   true,
-	"output":     true,
-	"input":      true,
-	"units":      true,
-	"format":     true,
-	"value":      true,
-	"note":       true,
+	"required":     true,
+	"desc":         true,
+	"default":      true,
+	"eg":           true,
+	"exclude":      true,
+	"deprecated":   true,
+	"reserved":     true,
+	"output":       true,
+	"input":        true,
+	"units":        true,
+	"format":       true,
+	"value":        true,
+	"note":         true,
+	"disable-desc": true,
 }
 
 var wktSchemas = map[string]schemaCore{
@@ -1368,6 +1369,8 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 			extra = append(extra, "取值: "+val)
 		case "note":
 			extra = append(extra, val)
+		case "disable-desc":
+			co.DisableDesc = true
 		}
 	}
 
@@ -1383,6 +1386,9 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	}
 	if co.Input {
 		extra = append(extra, "REQ_ONLY")
+	}
+	if co.DisableDesc {
+		co.Description = ""
 	}
 	if len(extra) > 0 {
 		co.Summary += fmt.Sprintf("（%s）", strings.Join(extra, " | "))

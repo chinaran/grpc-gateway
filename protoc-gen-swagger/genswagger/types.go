@@ -275,6 +275,8 @@ type commentObject struct {
 	Format string
 	// @value
 	Value string
+	// @disableDesc
+	DisableDesc bool
 }
 
 // tag object
