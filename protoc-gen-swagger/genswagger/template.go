@@ -1352,6 +1352,11 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 			co.Exclude = true
 		case "deprecated":
 			co.Deprecated = true
+			tmp := "已废弃"
+			if val != "" {
+				tmp += ": " + val
+			}
+			extra = append(extra, tmp)
 		case "reserved":
 			co.Reserved = true
 		case "output":
@@ -1375,9 +1380,6 @@ func newCommentObject(comment string, setDescIfEmpty, replaceDescEnter bool) *co
 	}
 
 	// fixed: 标识重复
-	if co.Deprecated {
-		extra = append(extra, "已废弃")
-	}
 	if co.Reserved {
 		extra = append(extra, "保留的")
 	}
