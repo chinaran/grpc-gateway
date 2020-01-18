@@ -4,10 +4,6 @@
     "title": "examples/proto/examplepb/stream.proto",
     "version": "version not set"
   },
-  "schemes": [
-    "http",
-    "https"
-  ],
   "consumes": [
     "application/json"
   ],
@@ -102,7 +98,8 @@
           "format": "int64"
         },
         "ok": {
-          "$ref": "#/definitions/NestedDeepEnum"
+          "$ref": "#/definitions/NestedDeepEnum",
+          "description": "DeepEnum description."
         }
       },
       "description": "Nested is nested type."
@@ -294,6 +291,10 @@
           "$ref": "#/definitions/ABitOfEverythingNested",
           "description": "Nested object description.",
           "title": "Nested object title"
+        },
+        "int64_override_type": {
+          "type": "integer",
+          "format": "int64"
         }
       },
       "description": "Intentionaly complicated message type to cover many features of Protobuf.",

@@ -67,6 +67,14 @@ type Registry struct {
 	// If false, the default behavior is to concat the last 2 elements of the FQN if they are unique, otherwise concat
 	// all the elements of the FQN without any separator
 	useFQNForSwaggerName bool
+
+	// allowColonFinalSegments determines whether colons are permitted
+	// in the final segment of a path.
+	allowColonFinalSegments bool
+
+	// useGoTemplate determines whether you want to use GO templates
+	// in your protofile comments
+	useGoTemplate bool
 }
 
 type repeatedFieldSeparator struct {
@@ -422,6 +430,16 @@ func (r *Registry) SetUseFQNForSwaggerName(use bool) {
 	r.useFQNForSwaggerName = use
 }
 
+// GetAllowColonFinalSegments returns allowColonFinalSegments
+func (r *Registry) GetAllowColonFinalSegments() bool {
+	return r.allowColonFinalSegments
+}
+
+// SetAllowColonFinalSegments sets allowColonFinalSegments
+func (r *Registry) SetAllowColonFinalSegments(use bool) {
+	r.allowColonFinalSegments = use
+}
+
 // GetUseFQNForSwaggerName returns useFQNForSwaggerName
 func (r *Registry) GetUseFQNForSwaggerName() bool {
 	return r.useFQNForSwaggerName
@@ -430,6 +448,16 @@ func (r *Registry) GetUseFQNForSwaggerName() bool {
 // GetMergeFileName return the target merge swagger file name
 func (r *Registry) GetMergeFileName() string {
 	return r.mergeFileName
+}
+
+// SetUseGoTemplate sets useGoTemplate
+func (r *Registry) SetUseGoTemplate(use bool) {
+	r.useGoTemplate = use
+}
+
+// GetUseGoTemplate returns useGoTemplate
+func (r *Registry) GetUseGoTemplate() bool {
+	return r.useGoTemplate
 }
 
 // sanitizePackageName replaces unallowed character in package name

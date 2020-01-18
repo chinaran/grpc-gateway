@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/golang/glog"
@@ -66,12 +67,85 @@ func mergeTargetFile(targets []*wrapper, mergeFileName string) *wrapper {
 	return mergedTarget
 }
 
-// convert swagger file obj to plugin.CodeGeneratorResponse_File
-func encodeSwagger(file *wrapper) *plugin.CodeGeneratorResponse_File {
+// Q: What's up with the alias types here?
+// A: We don't want to completely override how these structs are marshaled into
+//    JSON, we only want to add fields (see below, extensionMarshalJSON).
+//    An infinite recursion would happen if we'd call json.Marshal on the struct
+//    that has swaggerObject as an embedded field. To avoid that, we'll create
+//    type aliases, and those don't have the custom MarshalJSON methods defined
+//    on them. See http://choly.ca/post/go-json-marshalling/ (or, if it ever
+//    goes away, use
+//    https://web.archive.org/web/20190806073003/http://choly.ca/post/go-json-marshalling/.
+func (so swaggerObject) MarshalJSON() ([]byte, error) {
+	type alias swaggerObject
+	return extensionMarshalJSON(alias(so), so.extensions)
+}
+
+func (so swaggerInfoObject) MarshalJSON() ([]byte, error) {
+	type alias swaggerInfoObject
+	return extensionMarshalJSON(alias(so), so.extensions)
+}
+
+func (so swaggerSecuritySchemeObject) MarshalJSON() ([]byte, error) {
+	type alias swaggerSecuritySchemeObject
+	return extensionMarshalJSON(alias(so), so.extensions)
+}
+
+func (so swaggerOperationObject) MarshalJSON() ([]byte, error) {
+	type alias swaggerOperationObject
+	return extensionMarshalJSON(alias(so), so.extensions)
+}
+
+func (so swaggerResponseObject) MarshalJSON() ([]byte, error) {
+	type alias swaggerResponseObject
+	return extensionMarshalJSON(alias(so), so.extensions)
+}
+
+func extensionMarshalJSON(so interface{}, extensions []extension) ([]byte, error) {
+	// To append arbitrary keys to the struct we'll render into json,
+	// we're creating another struct that embeds the original one, and
+	// its extra fields:
+	//
+	// The struct will look like
+	// struct {
+	//   *swaggerCore
+	//   XGrpcGatewayFoo json.RawMessage `json:"x-grpc-gateway-foo"`
+	//   XGrpcGatewayBar json.RawMessage `json:"x-grpc-gateway-bar"`
+	// }
+	// and thus render into what we want -- the JSON of swaggerCore with the
+	// extensions appended.
+	fields := []reflect.StructField{
+		reflect.StructField{ // embedded
+			Name:      "Embedded",
+			Type:      reflect.TypeOf(so),
+			Anonymous: true,
+		},
+	}
+	for _, ext := range extensions {
+		fields = append(fields, reflect.StructField{
+			Name: fieldName(ext.key),
+			Type: reflect.TypeOf(ext.value),
+			Tag:  reflect.StructTag(fmt.Sprintf("json:\"%s\"", ext.key)),
+		})
+	}
+
+	t := reflect.StructOf(fields)
+	s := reflect.New(t).Elem()
+	s.Field(0).Set(reflect.ValueOf(so))
+	for _, ext := range extensions {
+		s.FieldByName(fieldName(ext.key)).Set(reflect.ValueOf(ext.value))
+	}
+	return json.Marshal(s.Interface())
+}
+
+// encodeSwagger converts swagger file obj to plugin.CodeGeneratorResponse_File
+func encodeSwagger(file *wrapper) (*plugin.CodeGeneratorResponse_File, error) {
 	var formatted bytes.Buffer
 	enc := json.NewEncoder(&formatted)
 	enc.SetIndent("", "  ")
-	enc.Encode(*file.swagger)
+	if err := enc.Encode(*file.swagger); err != nil {
+		return nil, err
+	}
 	name := file.fileName
 	ext := filepath.Ext(name)
 	base := strings.TrimSuffix(name, ext)
@@ -79,7 +153,7 @@ func encodeSwagger(file *wrapper) *plugin.CodeGeneratorResponse_File {
 	return &plugin.CodeGeneratorResponse_File{
 		Name:    proto.String(output),
 		Content: proto.String(formatted.String()),
-	}
+	}, nil
 }
 
 func (g *generator) Generate(targets []*descriptor.File) ([]*plugin.CodeGeneratorResponse_File, error) {
@@ -127,11 +201,19 @@ func (g *generator) Generate(targets []*descriptor.File) ([]*plugin.CodeGenerato
 
 	if g.reg.IsAllowMerge() {
 		targetSwagger := mergeTargetFile(swaggers, g.reg.GetMergeFileName())
-		files = append(files, encodeSwagger(targetSwagger))
+		f, err := encodeSwagger(targetSwagger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode swagger for %s: %s", g.reg.GetMergeFileName(), err)
+		}
+		files = append(files, f)
 		glog.V(1).Infof("New swagger file will emit")
 	} else {
 		for _, file := range swaggers {
-			files = append(files, encodeSwagger(file))
+			f, err := encodeSwagger(file)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode swagger for %s: %s", file.fileName, err)
+			}
+			files = append(files, f)
 			glog.V(1).Infof("New swagger file will emit")
 		}
 	}

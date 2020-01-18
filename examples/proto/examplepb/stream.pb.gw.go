@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/golang/protobuf/descriptor"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/grpc-ecosystem/grpc-gateway/examples/proto/sub"
@@ -24,11 +25,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Suppress "imported and not used" errors
 var _ codes.Code
 var _ io.Reader
 var _ status.Status
 var _ = runtime.String
 var _ = utilities.NewDoubleArray
+var _ = descriptor.ForMessage
 
 func request_StreamService_BulkCreate_0(ctx context.Context, marshaler runtime.Marshaler, client StreamServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var metadata runtime.ServerMetadata
@@ -37,11 +40,7 @@ func request_StreamService_BulkCreate_0(ctx context.Context, marshaler runtime.M
 		grpclog.Infof("Failed to start streaming: %v", err)
 		return nil, metadata, err
 	}
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	dec := marshaler.NewDecoder(newReader())
+	dec := marshaler.NewDecoder(req.Body)
 	for {
 		var protoReq ABitOfEverything
 		err = dec.Decode(&protoReq)
@@ -53,6 +52,9 @@ func request_StreamService_BulkCreate_0(ctx context.Context, marshaler runtime.M
 			return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 		}
 		if err = stream.Send(&protoReq); err != nil {
+			if err == io.EOF {
+				break
+			}
 			grpclog.Infof("Failed to send request: %v", err)
 			return nil, metadata, err
 		}
@@ -99,11 +101,7 @@ func request_StreamService_BulkEcho_0(ctx context.Context, marshaler runtime.Mar
 		grpclog.Infof("Failed to start streaming: %v", err)
 		return nil, metadata, err
 	}
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, berr
-	}
-	dec := marshaler.NewDecoder(newReader())
+	dec := marshaler.NewDecoder(req.Body)
 	handleSend := func() error {
 		var protoReq sub.StringMessage
 		err := dec.Decode(&protoReq)
@@ -146,6 +144,35 @@ func request_StreamService_BulkEcho_0(ctx context.Context, marshaler runtime.Mar
 	}
 	metadata.HeaderMD = header
 	return stream, metadata, nil
+}
+
+// RegisterStreamServiceHandlerServer registers the http handlers for service StreamService to "mux".
+// UnaryRPC     :call StreamServiceServer directly.
+// StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
+func RegisterStreamServiceHandlerServer(ctx context.Context, mux *runtime.ServeMux, server StreamServiceServer) error {
+
+	mux.Handle("POST", pattern_StreamService_BulkCreate_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
+	})
+
+	mux.Handle("GET", pattern_StreamService_List_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
+	})
+
+	mux.Handle("POST", pattern_StreamService_BulkEcho_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
+	})
+
+	return nil
 }
 
 // RegisterStreamServiceHandlerFromEndpoint is same as RegisterStreamServiceHandler but
@@ -250,11 +277,11 @@ func RegisterStreamServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 }
 
 var (
-	pattern_StreamService_BulkCreate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "example", "a_bit_of_everything", "bulk"}, ""))
+	pattern_StreamService_BulkCreate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "example", "a_bit_of_everything", "bulk"}, "", runtime.AssumeColonVerbOpt(true)))
 
-	pattern_StreamService_List_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "example", "a_bit_of_everything"}, ""))
+	pattern_StreamService_List_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "example", "a_bit_of_everything"}, "", runtime.AssumeColonVerbOpt(true)))
 
-	pattern_StreamService_BulkEcho_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "example", "a_bit_of_everything", "echo"}, ""))
+	pattern_StreamService_BulkEcho_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "example", "a_bit_of_everything", "echo"}, "", runtime.AssumeColonVerbOpt(true)))
 )
 
 var (

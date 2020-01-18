@@ -25,6 +25,8 @@ type swaggerInfoObject struct {
 
 	Contact *swaggerContactObject `json:"contact,omitempty"`
 	License *swaggerLicenseObject `json:"license,omitempty"`
+
+	extensions []extension
 }
 
 // http://swagger.io/specification/#contactObject
@@ -46,6 +48,11 @@ type swaggerExternalDocumentationObject struct {
 	URL         string `json:"url,omitempty"`
 }
 
+type extension struct {
+	key   string
+	value json.RawMessage
+}
+
 // http://swagger.io/specification/#swaggerObject
 type swaggerObject struct {
 	Swagger             string                              `json:"swagger"`
@@ -53,7 +60,7 @@ type swaggerObject struct {
 	Host                string                              `json:"host,omitempty"`
 	BasePath            string                              `json:"basePath,omitempty"`
 	Tags                []*tagObject                        `json:"tags,omitempty"`
-	Schemes             []string                            `json:"schemes"`
+	Schemes             []string                            `json:"schemes,omitempty"`
 	Consumes            []string                            `json:"consumes"`
 	Produces            []string                            `json:"produces"`
 	Paths               swaggerPathsObject                  `json:"paths"`
@@ -62,6 +69,8 @@ type swaggerObject struct {
 	SecurityDefinitions swaggerSecurityDefinitionsObject    `json:"securityDefinitions,omitempty"`
 	Security            []swaggerSecurityRequirementObject  `json:"security,omitempty"`
 	ExternalDocs        *swaggerExternalDocumentationObject `json:"externalDocs,omitempty"`
+
+	extensions []extension
 }
 
 // http://swagger.io/specification/#securityDefinitionsObject
@@ -77,6 +86,8 @@ type swaggerSecuritySchemeObject struct {
 	AuthorizationURL string              `json:"authorizationUrl,omitempty"`
 	TokenURL         string              `json:"tokenUrl,omitempty"`
 	Scopes           swaggerScopesObject `json:"scopes,omitempty"`
+
+	extensions []extension
 }
 
 // http://swagger.io/specification/#scopesObject
@@ -109,6 +120,8 @@ type swaggerOperationObject struct {
 
 	Security     *[]swaggerSecurityRequirementObject `json:"security,omitempty"`
 	ExternalDocs *swaggerExternalDocumentationObject `json:"externalDocs,omitempty"`
+
+	extensions []extension
 }
 
 type swaggerParametersObject []swaggerParameterObject
@@ -152,13 +165,6 @@ type schemaCore struct {
 
 type swaggerItemsObject schemaCore
 
-func (o *swaggerItemsObject) getType() string {
-	if o == nil {
-		return ""
-	}
-	return o.Type
-}
-
 // http://swagger.io/specification/#responsesObject
 type swaggerResponsesObject map[string]swaggerResponseObject
 
@@ -166,6 +172,8 @@ type swaggerResponsesObject map[string]swaggerResponseObject
 type swaggerResponseObject struct {
 	Description string              `json:"description"`
 	Schema      swaggerSchemaObject `json:"schema"`
+
+	extensions []extension
 }
 
 type keyVal struct {
