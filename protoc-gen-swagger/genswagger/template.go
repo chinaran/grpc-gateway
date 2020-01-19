@@ -993,7 +993,7 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 					}
 				}
 
-				methComments := protoComments(reg, svc.File, nil, "Method", int32(svcIdx), methProtoPath, int32(methIdx))
+				methComments := protoComments(reg, svc.File, nil, "Service", int32(svcIdx), methProtoPath, int32(methIdx))
 				if excludeFromComment(methComments) {
 					continue
 				}
