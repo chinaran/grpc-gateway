@@ -414,42 +414,6 @@ func renderMessagesAsDefinition(messages messageMap, d swaggerDefinitionsObject,
 	}
 }
 
-func renderMessagesAsStreamDefinition(messages messageMap, d swaggerDefinitionsObject, reg *descriptor.Registry) {
-	for name, msg := range messages {
-		if skipRenderingRef(name) {
-			continue
-		}
-
-		if opt := msg.GetOptions(); opt != nil && opt.MapEntry != nil && *opt.MapEntry {
-			continue
-		}
-		d[fullyQualifiedNameToSwaggerName(msg.FQMN(), reg)] = swaggerSchemaObject{
-			schemaCore: schemaCore{
-				Type: "object",
-			},
-			Title: fmt.Sprintf("Stream result of %s", fullyQualifiedNameToSwaggerName(msg.FQMN(), reg)),
-			Properties: &swaggerSchemaObjectProperties{
-				keyVal{
-					Key: "result",
-					Value: swaggerSchemaObject{
-						schemaCore: schemaCore{
-							Ref: fmt.Sprintf("#/definitions/%s", fullyQualifiedNameToSwaggerName(msg.FQMN(), reg)),
-						},
-					},
-				},
-				keyVal{
-					Key: "error",
-					Value: swaggerSchemaObject{
-						schemaCore: schemaCore{
-							Ref: fmt.Sprintf("#/definitions/%s", fullyQualifiedNameToSwaggerName(".grpc.gateway.runtime.StreamError", reg)),
-						},
-					},
-				},
-			},
-		}
-	}
-}
-
 // schemaOfField returns a swagger Schema Object for a protobuf field.
 func schemaOfField(f *descriptor.Field, reg *descriptor.Registry, refs refMap) swaggerSchemaObject {
 	const (
@@ -957,8 +921,26 @@ func renderServices(services []*descriptor.Service, paths swaggerPathsObject, ta
 				}
 				if meth.GetServerStreaming() {
 					desc += "(streaming responses)"
-					// Use the streamdefinition which wraps the message in a "result"
-					responseSchema.Ref = strings.Replace(responseSchema.Ref, `#/definitions/`, `#/x-stream-definitions/`, 1)
+					responseSchema.Type = "object"
+					responseSchema.Title = fmt.Sprintf("Stream result of %s", fullyQualifiedNameToSwaggerName(meth.ResponseType.FQMN(), reg))
+					responseSchema.Properties = &swaggerSchemaObjectProperties{
+						keyVal{
+							Key: "result",
+							Value: swaggerSchemaObject{
+								schemaCore: schemaCore{
+									Ref: responseSchema.Ref,
+								},
+							},
+						},
+						keyVal{
+							Key: "error",
+							Value: swaggerSchemaObject{
+								schemaCore: schemaCore{
+									Ref: fmt.Sprintf("#/definitions/%s", fullyQualifiedNameToSwaggerName(".grpc.gateway.runtime.StreamError", reg))},
+							},
+						},
+					}
+					responseSchema.Ref = ""
 				}
 
 				/* update service tag by comment (Alan 2019-03-06 14:35:53) */
@@ -1106,14 +1088,13 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	// defined off of.
 	s := swaggerObject{
 		// Swagger 2.0 is the version of this document
-		Swagger:           "2.0",
-		Schemes:           []string{"http", "https"},
-		Tags:              []*tagObject{},
-		Consumes:          []string{}, // alan chg for yapi
-		Produces:          []string{"application/json"},
-		Paths:             make(swaggerPathsObject),
-		Definitions:       make(swaggerDefinitionsObject),
-		StreamDefinitions: make(swaggerDefinitionsObject),
+		Swagger:     "2.0",
+		Schemes:     []string{"http", "https"},
+		Tags:        []*tagObject{},
+		Consumes:    []string{}, // alan chg for yapi
+		Produces:    []string{"application/json"},
+		Paths:       make(swaggerPathsObject),
+		Definitions: make(swaggerDefinitionsObject),
 		Info: swaggerInfoObject{
 			Title:   *p.File.Name,
 			Version: "version not set",
@@ -1135,7 +1116,6 @@ func applyTemplate(p param) (*swaggerObject, error) {
 	e := enumMap{}
 	findServicesMessagesAndEnumerations(p.Services, p.reg, m, ms, e, requestResponseRefs)
 	renderMessagesAsDefinition(m, s.Definitions, p.reg, customRefs)
-	renderMessagesAsStreamDefinition(ms, s.StreamDefinitions, p.reg)
 	renderEnumerationsAsDefinition(e, s.Definitions, p.reg)
 
 	// File itself might have some comments and metadata.
